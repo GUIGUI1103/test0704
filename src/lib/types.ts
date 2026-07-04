@@ -54,27 +54,45 @@ export function generateToken(): string {
   return Math.random().toString(36).substr(2, 16)
 }
 
-// localStorage 操作
-export function getQuizzes(): Quiz[] {
-  if (typeof window === 'undefined') return []
-  const data = localStorage.getItem('mindquiz_quizzes')
-  return data ? JSON.parse(data) : []
+// 服务器端 API 存储
+export async function getQuizzes(): Promise<Quiz[]> {
+  try {
+    const res = await fetch('/api/quizzes', { cache: 'no-store' })
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
-export function saveQuizzes(quizzes: Quiz[]): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem('mindquiz_quizzes', JSON.stringify(quizzes))
+export async function saveQuizzes(quizzes: Quiz[]): Promise<void> {
+  try {
+    await fetch('/api/quizzes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(quizzes),
+    })
+  } catch {}
 }
 
-export function getShareTokens(): ShareToken[] {
-  if (typeof window === 'undefined') return []
-  const data = localStorage.getItem('mindquiz_tokens')
-  return data ? JSON.parse(data) : []
+export async function getShareTokens(): Promise<ShareToken[]> {
+  try {
+    const res = await fetch('/api/tokens', { cache: 'no-store' })
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
-export function saveShareTokens(tokens: ShareToken[]): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem('mindquiz_tokens', JSON.stringify(tokens))
+export async function saveShareTokens(tokens: ShareToken[]): Promise<void> {
+  try {
+    await fetch('/api/tokens', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tokens),
+    })
+  } catch {}
 }
 
 // 计算测评结果
@@ -87,7 +105,7 @@ export function calculateResult(quiz: Quiz, answers: Record<string, string>): Qu
       totalScore += option.score
     }
   })
-  
+
   const result = quiz.results.find(
     (r) => totalScore >= r.minScore && totalScore <= r.maxScore
   )
