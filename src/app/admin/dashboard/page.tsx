@@ -38,17 +38,18 @@ export default function AdminDashboard() {
       }
       getQuizzes().then(setQuizzes)
       getShareTokens().then(setTokens)
-      
     }
   }, [router])
 
-  const refreshData = () => {
-    setQuizzes(getQuizzes())
-    setTokens(getShareTokens())
+  const refreshData = async () => {
+    const q = await getQuizzes()
+    const t = await getShareTokens()
+    setQuizzes(q)
+    setTokens(t)
   }
 
   // ====== JSON 导入 ======
-  const handleImportJson = () => {
+  const handleImportJson = async () => {
     setJsonError('')
     if (!jsonText.trim()) {
       setJsonError('请输入 JSON 内容')
@@ -57,7 +58,6 @@ export default function AdminDashboard() {
     try {
       const data = JSON.parse(jsonText.trim())
 
-      // 验证必填字段
       if (!data.title || typeof data.title !== 'string') {
         setJsonError('缺少 title（测评标题）')
         return
@@ -71,7 +71,6 @@ export default function AdminDashboard() {
         return
       }
 
-      // 验证题目结构
       for (let i = 0; i < data.questions.length; i++) {
         const q = data.questions[i]
         if (!q.text || typeof q.text !== 'string') {
@@ -95,7 +94,6 @@ export default function AdminDashboard() {
         }
       }
 
-      // 验证结果结构
       for (let i = 0; i < data.results.length; i++) {
         const r = data.results[i]
         if (!r.title || typeof r.title !== 'string') {
@@ -116,7 +114,6 @@ export default function AdminDashboard() {
         }
       }
 
-      // 构建 Quiz 对象
       const importedQuestions: QuizQuestion[] = data.questions.map((q: any) => ({
         id: generateId(),
         text: q.text,
@@ -147,8 +144,8 @@ export default function AdminDashboard() {
       }
 
       const updated = [...quizzes, newQuiz]
-      saveQuizzes(updated)
-      refreshData()
+      await saveQuizzes(updated)
+      await refreshData()
       setJsonText('')
       setActiveTab('list')
       alert('导入成功！')
@@ -191,11 +188,11 @@ export default function AdminDashboard() {
     setActiveTab('edit')
   }
 
-  const deleteQuiz = (id: string) => {
+  const deleteQuiz = async (id: string) => {
     if (!confirm('确定删除该测评？')) return
     const updated = quizzes.filter((q) => q.id !== id)
-    saveQuizzes(updated)
-    refreshData()
+    await saveQuizzes(updated)
+    await refreshData()
   }
 
   const addQuestion = () => {
@@ -248,12 +245,11 @@ export default function AdminDashboard() {
     setFormResults(formResults.filter((_, i) => i !== index))
   }
 
-  const saveQuiz = () => {
+  const saveQuiz = async () => {
     if (!formTitle.trim() || formQuestions.length === 0 || formResults.length === 0) {
       alert('请填写完整信息')
       return
     }
-    // 检查题目和选项是否填写完整
     for (const q of formQuestions) {
       if (!q.text.trim()) { alert('请填写所有题目'); return }
       for (const o of q.options) {
@@ -281,13 +277,13 @@ export default function AdminDashboard() {
     } else {
       updated = [...quizzes, quizData]
     }
-    saveQuizzes(updated)
-    refreshData()
+    await saveQuizzes(updated)
+    await refreshData()
     setActiveTab('list')
   }
 
   // ====== 分享链接 ======
-  const generateShareLink = (quizId: string) => {
+  const generateShareLink = async (quizId: string) => {
     const token = generateToken()
     const newToken: ShareToken = {
       id: generateId(),
@@ -297,8 +293,8 @@ export default function AdminDashboard() {
       createdAt: new Date().toISOString(),
     }
     const updated = [...tokens, newToken]
-    saveShareTokens(updated)
-    refreshData()
+    await saveShareTokens(updated)
+    await refreshData()
     return token
   }
 
@@ -306,7 +302,6 @@ export default function AdminDashboard() {
     const origin = typeof window !== 'undefined' ? window.location.origin : ''
     const link = `${origin}/share?token=${token}`
 
-    // 降级复制方案：优先用 Clipboard API，失败则用传统方法
     const doCopy = () => {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(link).then(() => {
@@ -338,10 +333,10 @@ export default function AdminDashboard() {
     doCopy()
   }
 
-  const deleteToken = (id: string) => {
+  const deleteToken = async (id: string) => {
     const updated = tokens.filter((t) => t.id !== id)
-    saveShareTokens(updated)
-    refreshData()
+    await saveShareTokens(updated)
+    await refreshData()
   }
 
   const handleLogout = () => {
@@ -426,9 +421,10 @@ export default function AdminDashboard() {
                     编辑配置
                   </button>
                   <button
-                    onClick={() => {
-                      const token = generateShareLink(quiz.id)
-                      copyLink(token)
+                    onClick={async () => {
+                      const token = await generateShareLink(quiz.id)
+                      setActiveTab('tokens')
+                      setTimeout(() => copyLink(token), 100)
                     }}
                     className="flex-1 py-2 rounded-lg text-xs bg-green-50 text-green-600 active:scale-[0.98] transition-all"
                   >
@@ -436,28 +432,28 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => deleteQuiz(quiz.id)}
-                    className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-400 active:scale-[0.98] transition-all"
+                    className="py-2 px-3 rounded-lg text-xs bg-red-50 text-red-500 active:scale-[0.98] transition-all"
                   >
                     删除
                   </button>
                 </div>
               </div>
             ))}
-            {quizzes.length === 0 && (
-              <div className="text-center py-12 text-gray-400 text-sm">暂无测评，点击上方按钮创建</div>
-            )}
           </div>
         )}
 
         {/* ====== JSON 导入 ====== */}
         {activeTab === 'import' && (
-          <div className="bg-white rounded-xl p-4 border border-gray-100 space-y-4">
-            <h2 className="text-sm font-medium text-gray-700">导入 JSON 格式测评</h2>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              请粘贴符合以下格式的 JSON：
-            </p>
-            <pre className="bg-gray-50 rounded-lg p-3 text-[10px] text-gray-500 overflow-x-auto leading-relaxed">
-{`{
+          <div className="space-y-4 pb-20">
+            <div className="bg-white rounded-xl p-4 border border-gray-100 space-y-3">
+              <h3 className="text-sm font-medium text-gray-700">导入 JSON 测评</h3>
+              <p className="text-xs text-gray-400">
+                粘贴符合格式的 JSON，系统会自动创建测评。
+              </p>
+              <textarea
+                value={jsonText}
+                onChange={(e) => setJsonText(e.target.value)}
+                placeholder={`{
   "title": "测评标题",
   "description": "描述",
   "estimatedTime": "3分钟",
@@ -474,26 +470,102 @@ export default function AdminDashboard() {
     {
       "title": "结果标题",
       "description": "结果解释",
-      "minScore": 0,
-      "maxScore": 10
+      "minScore": 1,
+      "maxScore": 5
     }
   ]
 }`}
-            </pre>
-            <textarea
-              value={jsonText}
-              onChange={(e) => setJsonText(e.target.value)}
-              placeholder="在此粘贴 JSON..."
-              className="w-full h-64 px-4 py-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-primary-400 transition-colors resize-none font-mono"
-            />
-            {jsonError && (
-              <div className="p-3 bg-red-50 rounded-lg text-xs text-red-500">{jsonError}</div>
-            )}
-            <button
-              onClick={handleImportJson}
-              className="w-full py-3 rounded-xl text-sm font-medium bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-sm active:scale-[0.98] transition-all"
-            >
-              确认导入
+                rows={16}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:outline-none focus:border-primary-400 resize-none"
+              />
+              {jsonError && (
+                <div className="p-3 bg-red-50 rounded-lg text-xs text-red-500">
+                  {jsonError}
+                </div>
+              )}
+              <button
+                onClick={handleImportJson}
+                className="w-full py-3.5 rounded-xl text-sm font-medium bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-sm active:scale-[0.98] transition-all"
+              >
+                导入测评
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ====== 编辑问卷 ====== */}
+        {activeTab === 'edit' && (
+          <div className="space-y-4 pb-20">
+            <div className="bg-white rounded-xl p-4 border border-gray-100 space-y-3">
+              <h3 className="text-sm font-medium text-gray-700">基本信息</h3>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">测评标题</label>
+                <input type="text" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="如：你的焦虑指数有多高？" className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">测评描述</label>
+                <input type="text" value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="简短描述" className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">预计用时</label>
+                <input type="text" value={formTime} onChange={(e) => setFormTime(e.target.value)} placeholder="如：3分钟" className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">题目（{formQuestions.length}题）</h3>
+                <button onClick={addQuestion} className="text-xs text-primary-500 bg-primary-50 px-3 py-1.5 rounded-lg">+ 添加题目</button>
+              </div>
+              {formQuestions.map((q, qIndex) => (
+                <div key={q.id} className="bg-white rounded-xl p-4 border border-gray-100 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <span className="text-xs text-primary-500 font-medium">第{qIndex + 1}题</span>
+                    {formQuestions.length > 1 && <button onClick={() => removeQuestion(qIndex)} className="text-xs text-red-400">删除</button>}
+                  </div>
+                  <textarea value={q.text} onChange={(e) => updateQuestion(qIndex, 'text', e.target.value)} placeholder="题目内容" rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400 resize-none" />
+                  <div className="space-y-2">
+                    {q.options.map((opt, oIndex) => (
+                      <div key={opt.id} className="flex gap-2 items-center">
+                        <span className="text-xs text-gray-400 w-4">{String.fromCharCode(65 + oIndex)}</span>
+                        <input type="text" value={opt.text} onChange={(e) => updateOption(qIndex, oIndex, 'text', e.target.value)} placeholder={`选项${String.fromCharCode(65 + oIndex)}`} className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-primary-400" />
+                        <input type="number" value={opt.score} onChange={(e) => updateOption(qIndex, oIndex, 'score', parseInt(e.target.value) || 0)} className="w-12 px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-primary-400" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">结果映射（{formResults.length}个）</h3>
+                <button onClick={addResult} className="text-xs text-primary-500 bg-primary-50 px-3 py-1.5 rounded-lg">+ 添加结果</button>
+              </div>
+              {formResults.map((r, rIndex) => (
+                <div key={r.id} className="bg-white rounded-xl p-4 border border-gray-100 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <span className="text-xs text-primary-500 font-medium">结果{rIndex + 1}</span>
+                    {formResults.length > 1 && <button onClick={() => removeResult(rIndex)} className="text-xs text-red-400">删除</button>}
+                  </div>
+                  <input type="text" value={r.title} onChange={(e) => updateResult(rIndex, 'title', e.target.value)} placeholder="结果标题" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400" />
+                  <textarea value={r.description} onChange={(e) => updateResult(rIndex, 'description', e.target.value)} placeholder="结果解释" rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400 resize-none" />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-gray-400">最低分</label>
+                      <input type="number" value={r.minScore} onChange={(e) => updateResult(rIndex, 'minScore', parseInt(e.target.value) || 0)} className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-primary-400" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-gray-400">最高分</label>
+                      <input type="number" value={r.maxScore} onChange={(e) => updateResult(rIndex, 'maxScore', parseInt(e.target.value) || 0)} className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-primary-400" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={saveQuiz} className="w-full py-3.5 rounded-xl text-sm font-medium bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-sm active:scale-[0.98] transition-all">
+              {editingQuiz ? '保存修改' : '创建测评'}
             </button>
           </div>
         )}
@@ -501,207 +573,29 @@ export default function AdminDashboard() {
         {/* ====== 分享链接管理 ====== */}
         {activeTab === 'tokens' && (
           <div className="space-y-3">
-            {tokens.length === 0 && (
-              <div className="text-center py-12 text-gray-400 text-sm">暂无分享链接，在「问卷管理」中点击「生成链接」创建</div>
+            <div className="bg-primary-50 rounded-xl p-3 border border-primary-100">
+              <p className="text-xs text-primary-600">💡 分享链接永久有效，复制链接发送给用户即可。</p>
+            </div>
+            {tokens.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-sm">暂无分享链接</div>
+            ) : (
+              tokens.map((token) => {
+                const quiz = quizzes.find((q) => q.id === token.quizId)
+                return (
+                  <div key={token.id} className="bg-white rounded-xl p-4 border border-gray-100">
+                    <span className="text-sm font-medium text-gray-700">{quiz?.title || '已删除'}</span>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share?token=${token.token}`} className="flex-1 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 truncate focus:outline-none" onClick={(e) => (e.target as HTMLInputElement).select()} />
+                      <button onClick={() => copyLink(token.token)} className="px-3 py-2 rounded-lg text-xs bg-primary-50 text-primary-600 whitespace-nowrap">
+                        {copiedToken === token.token ? '已复制 ✓' : '复制'}
+                      </button>
+                      <a href={`/share?token=${token.token}`} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs bg-green-50 text-green-600 whitespace-nowrap">打开</a>
+                      <button onClick={() => deleteToken(token.id)} className="px-2 py-2 rounded-lg text-xs bg-red-50 text-red-400">✕</button>
+                    </div>
+                  </div>
+                )
+              })
             )}
-            {tokens.slice().reverse().map((t) => (
-              <div key={t.id} className={`bg-white rounded-xl p-4 border ${t.used ? 'border-gray-100 opacity-50' : 'border-green-100'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${t.used ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600'}`}>
-                    {t.used ? '已使用' : '未使用'}
-                  </span>
-                  <span className="text-[10px] text-gray-300">{new Date(t.createdAt).toLocaleDateString()}</span>
-                </div>
-                <p className="text-xs text-gray-500 mb-1 truncate">
-                  对应测评：{quizzes.find((q) => q.id === t.quizId)?.title || '已删除'}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <code className="flex-1 bg-gray-50 rounded-lg px-3 py-2 text-[10px] text-gray-400 truncate font-mono">
-                    {typeof window !== 'undefined' ? `${window.location.origin}/share?token=${t.token}` : ''}
-                  </code>
-                  {!t.used && (
-                    <button
-                      onClick={() => copyLink(t.token)}
-                      className="px-3 py-2 rounded-lg text-xs bg-primary-50 text-primary-600 active:scale-[0.98] transition-all whitespace-nowrap"
-                    >
-                      {copiedToken === t.token ? '已复制' : '复制'}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => deleteToken(t.id)}
-                    className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-400 active:scale-[0.98] transition-all"
-                  >
-                    删除
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ====== 编辑问卷 ====== */}
-        {activeTab === 'edit' && (
-          <div className="space-y-4 pb-20">
-            {/* 基本信息 */}
-            <div className="bg-white rounded-xl p-4 border border-gray-100 space-y-3">
-              <h3 className="text-sm font-medium text-gray-700">基本信息</h3>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1.5">测评标题</label>
-                <input
-                  type="text"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="如：你的焦虑指数有多高"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-primary-400 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1.5">简介描述</label>
-                <input
-                  type="text"
-                  value={formDesc}
-                  onChange={(e) => setFormDesc(e.target.value)}
-                  placeholder="简短描述测评内容"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-primary-400 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1.5">预计用时</label>
-                <input
-                  type="text"
-                  value={formTime}
-                  onChange={(e) => setFormTime(e.target.value)}
-                  placeholder="如：3分钟"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-primary-400 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* 题目 */}
-            <div className="bg-white rounded-xl p-4 border border-gray-100 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-700">题目设置</h3>
-                <span className="text-xs text-gray-400">{formQuestions.length} 题</span>
-              </div>
-              {formQuestions.map((q, qIdx) => (
-                <div key={q.id} className="space-y-2 pb-4 border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-primary-500">Q{qIdx + 1}</span>
-                    <input
-                      type="text"
-                      value={q.text}
-                      onChange={(e) => updateQuestion(qIdx, 'text', e.target.value)}
-                      placeholder="输入题目内容"
-                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400 transition-colors"
-                    />
-                    {formQuestions.length > 1 && (
-                      <button
-                        onClick={() => removeQuestion(qIdx)}
-                        className="text-xs text-red-400 px-2"
-                      >
-                        删除
-                      </button>
-                    )}
-                  </div>
-                  <div className="pl-6 space-y-2">
-                    {q.options.map((opt, oIdx) => (
-                      <div key={opt.id} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={opt.text}
-                          onChange={(e) => updateOption(qIdx, oIdx, 'text', e.target.value)}
-                          placeholder={`选项 ${oIdx + 1}`}
-                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-primary-400 transition-colors"
-                        />
-                        <input
-                          type="number"
-                          value={opt.score}
-                          onChange={(e) => updateOption(qIdx, oIdx, 'score', parseInt(e.target.value) || 0)}
-                          placeholder="分值"
-                          className="w-16 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-primary-400 transition-colors text-center"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <button
-                onClick={addQuestion}
-                className="w-full py-2 rounded-lg text-xs bg-gray-50 text-gray-500 border border-dashed border-gray-200 active:scale-[0.98] transition-all"
-              >
-                + 添加题目
-              </button>
-            </div>
-
-            {/* 结果映射 */}
-            <div className="bg-white rounded-xl p-4 border border-gray-100 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-700">结果映射</h3>
-                <span className="text-xs text-gray-400">{formResults.length} 个结果</span>
-              </div>
-              {formResults.map((r, rIdx) => (
-                <div key={r.id} className="space-y-2 pb-4 border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-primary-500">R{rIdx + 1}</span>
-                    <input
-                      type="text"
-                      value={r.title}
-                      onChange={(e) => updateResult(rIdx, 'title', e.target.value)}
-                      placeholder="结果标题，如：轻度焦虑"
-                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-primary-400 transition-colors"
-                    />
-                    {formResults.length > 1 && (
-                      <button
-                        onClick={() => removeResult(rIdx)}
-                        className="text-xs text-red-400 px-2"
-                      >
-                        删除
-                      </button>
-                    )}
-                  </div>
-                  <textarea
-                    value={r.description}
-                    onChange={(e) => updateResult(rIdx, 'description', e.target.value)}
-                    placeholder="结果详细解释..."
-                    className="w-full pl-6 px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-primary-400 transition-colors resize-none h-16"
-                  />
-                  <div className="pl-6 flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-400">最低分</span>
-                      <input
-                        type="number"
-                        value={r.minScore}
-                        onChange={(e) => updateResult(rIdx, 'minScore', parseInt(e.target.value) || 0)}
-                        className="w-14 px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-primary-400 transition-colors"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-400">最高分</span>
-                      <input
-                        type="number"
-                        value={r.maxScore}
-                        onChange={(e) => updateResult(rIdx, 'maxScore', parseInt(e.target.value) || 0)}
-                        className="w-14 px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-primary-400 transition-colors"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <button
-                onClick={addResult}
-                className="w-full py-2 rounded-lg text-xs bg-gray-50 text-gray-500 border border-dashed border-gray-200 active:scale-[0.98] transition-all"
-              >
-                + 添加结果
-              </button>
-            </div>
-
-            {/* 保存按钮 */}
-            <button
-              onClick={saveQuiz}
-              className="w-full py-3.5 rounded-xl text-sm font-medium bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-sm active:scale-[0.98] transition-all sticky bottom-4"
-            >
-              {editingQuiz ? '保存修改' : '创建测评'}
-            </button>
           </div>
         )}
       </div>
