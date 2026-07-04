@@ -302,10 +302,39 @@ export default function AdminDashboard() {
   }
 
   const copyLink = (token: string) => {
-    const link = `${window.location.origin}/share?token=${token}`
-    navigator.clipboard.writeText(link)
-    setCopiedToken(token)
-    setTimeout(() => setCopiedToken(''), 2000)
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const link = `${origin}/share?token=${token}`
+
+    // 降级复制方案：优先用 Clipboard API，失败则用传统方法
+    const doCopy = () => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(() => {
+          setCopiedToken(token)
+          setTimeout(() => setCopiedToken(''), 2000)
+        }).catch(() => fallbackCopy(link))
+      } else {
+        fallbackCopy(link)
+      }
+    }
+
+    const fallbackCopy = (text: string) => {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try {
+        document.execCommand('copy')
+        setCopiedToken(token)
+        setTimeout(() => setCopiedToken(''), 2000)
+      } catch {
+        alert('复制失败，请手动复制下方链接')
+      }
+      document.body.removeChild(ta)
+    }
+
+    doCopy()
   }
 
   const deleteToken = (id: string) => {
@@ -428,7 +457,29 @@ export default function AdminDashboard() {
               <textarea
                 value={jsonText}
                 onChange={(e) => setJsonText(e.target.value)}
-                placeholder={`示例格式：\n{\n  "title": "你的焦虑指数有多高？",\n  "description": "测评描述",\n  "estimatedTime": "3分钟",\n  "questions": [\n    {\n      "text": "题目内容",\n      "options": [\n        { "text": "选项A", "score": 1 },\n        { "text": "选项B", "score": 2 }\n      ]\n    }\n  ],\n  "results": [\n    {\n      "title": "🌸 心态平和",\n      "description": "结果解释...",\n      "minScore": 1,\n      "maxScore": 5\n    }\n  ]\n}`}
+                placeholder={`示例格式：
+{
+  "title": "你的焦虑指数有多高？",
+  "description": "测评描述",
+  "estimatedTime": "3分钟",
+  "questions": [
+    {
+      "text": "题目内容",
+      "options": [
+        { "text": "选项A", "score": 1 },
+        { "text": "选项B", "score": 2 }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "title": "🌸 心态平和",
+      "description": "结果解释...",
+      "minScore": 1,
+      "maxScore": 5
+    }
+  ]
+}`}
                 rows={16}
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:outline-none focus:border-primary-400 resize-none"
               />
@@ -640,9 +691,12 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 truncate">
-                        {window.location.origin}/share?token={token.token}
-                      </code>
+                      <input
+                        readOnly
+                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share?token=${token.token}`}
+                        className="flex-1 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 truncate focus:outline-none"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
                       {!token.used && (
                         <>
                           <button
@@ -651,6 +705,14 @@ export default function AdminDashboard() {
                           >
                             {copiedToken === token.token ? '已复制 ✓' : '复制'}
                           </button>
+                          <a
+                            href={`/share?token=${token.token}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 rounded-lg text-xs bg-green-50 text-green-600 active:scale-[0.98] transition-all whitespace-nowrap"
+                          >
+                            打开
+                          </a>
                           <button
                             onClick={() => deleteToken(token.id)}
                             className="px-2 py-2 rounded-lg text-xs bg-red-50 text-red-400 active:scale-[0.98] transition-all"
