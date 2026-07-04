@@ -25,9 +25,10 @@ function ResultContent() {
       }
     }
     if (quizId) {
-      const quizzes = getQuizzes()
-      const quiz = quizzes.find((q) => q.id === quizId)
-      if (quiz) setQuizTitle(quiz.title)
+      getQuizzes().then((quizzes) => {
+        const quiz = quizzes.find((q) => q.id === quizId)
+        if (quiz) setQuizTitle(quiz.title)
+      })
     }
   }, [searchParams])
 
@@ -70,12 +71,6 @@ function ResultContent() {
 
       {/* 操作按钮 */}
       <div className="fade-in-up fade-in-up-delay-3 w-full max-w-sm mt-8 space-y-3">
-        <button
-          onClick={() => router.push('/')}
-          className="w-full py-3.5 rounded-xl text-sm font-medium bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-sm active:scale-[0.98] transition-all"
-        >
-          返回首页
-        </button>
         <button
           onClick={() => router.back()}
           className="w-full py-3.5 rounded-xl text-sm font-medium bg-white border border-primary-200 text-primary-600 active:scale-[0.98] transition-all"

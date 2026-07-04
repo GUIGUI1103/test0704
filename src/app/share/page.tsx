@@ -1,51 +1,38 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Quiz, getQuizzes, getShareTokens, saveShareTokens } from '@/lib/types'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Quiz, getQuizzes, getShareTokens } from '@/lib/types'
 import { Suspense } from 'react'
 
 function SharePageContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [error, setError] = useState('')
   const [mounted, setMounted] = useState(false)
-  const processed = useRef(false)
 
   useEffect(() => {
     setMounted(true)
-    if (processed.current) return
-    processed.current = true
-
     const token = searchParams.get('token')
     if (!token) {
       setError('无效的链接')
       return
     }
 
-    // 验证token
-    const tokens = getShareTokens()
-    const found = tokens.find((t) => t.token === token && !t.used)
-    if (!found) {
-      setError('该链接已失效或不存在')
-      return
-    }
+    Promise.all([getShareTokens(), getQuizzes()]).then(([tokens, quizzes]) => {
+      const found = tokens.find((t) => t.token === token)
+      if (!found) {
+        setError('该链接不存在')
+        return
+      }
 
-    // 标记token为已使用
-    const updated = tokens.map((t) =>
-      t.token === token ? { ...t, used: true } : t
-    )
-    saveShareTokens(updated)
-
-    // 获取对应的测评
-    const quizzes = getQuizzes()
-    const quizData = quizzes.find((q) => q.id === found.quizId)
-    if (quizData) {
-      setQuiz(quizData)
-    } else {
-      setError('测评不存在')
-    }
+      const quizData = quizzes.find((q) => q.id === found.quizId)
+      if (quizData) {
+        setQuiz(quizData)
+      } else {
+        setError('测评不存在')
+      }
+    })
   }, [searchParams])
 
   if (!mounted) return null
@@ -56,13 +43,6 @@ function SharePageContent() {
         <div className="text-center">
           <p className="text-4xl mb-4">😔</p>
           <p className="text-primary-600 font-medium mb-2">{error}</p>
-          <p className="text-xs text-gray-400 mb-8">请联系分享者获取新的链接</p>
-          <button
-            onClick={() => router.push('/')}
-            className="px-6 py-3 rounded-xl text-sm font-medium bg-gradient-to-r from-primary-500 to-primary-600 text-white"
-          >
-            返回首页
-          </button>
         </div>
       </div>
     )

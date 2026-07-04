@@ -16,11 +16,12 @@ export default function QuizPage() {
 
   useEffect(() => {
     setMounted(true)
-    const quizzes = getQuizzes()
-    const found = quizzes.find((q) => q.id === id)
-    if (found) {
-      setQuiz(found)
-    }
+    getQuizzes().then((quizzes) => {
+      const found = quizzes.find((q) => q.id === id)
+      if (found) {
+        setQuiz(found)
+      }
+    })
   }, [id])
 
   if (!mounted || !quiz) {
@@ -43,7 +44,6 @@ export default function QuizPage() {
   const handleNext = () => {
     if (!hasAnswer) return
     if (isLastQuestion) {
-      // 提交
       const result = calculateResult(quiz, answers)
       const resultData = JSON.stringify(result)
       router.push(`/result?id=${id}&data=${encodeURIComponent(resultData)}`)
@@ -64,12 +64,6 @@ export default function QuizPage() {
       {/* 顶部进度区域 */}
       <div className="px-6 pt-8 pb-4">
         <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => router.push('/')}
-            className="text-primary-400 text-sm hover:text-primary-600 transition-colors"
-          >
-            ← 返回
-          </button>
           <span className="text-xs text-gray-400">
             {currentIndex + 1} / {quiz.questions.length}
           </span>

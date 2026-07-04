@@ -10,13 +10,15 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true)
-    let existing = getQuizzes()
-    if (existing.length === 0) {
-      // 首次使用，初始化示例数据
-      saveQuizzes([sampleQuiz])
-      existing = [sampleQuiz]
-    }
-    setQuizzes(existing)
+    getQuizzes().then((existing) => {
+      if (existing.length === 0) {
+        saveQuizzes([sampleQuiz]).then(() => {
+          setQuizzes([sampleQuiz])
+        })
+      } else {
+        setQuizzes(existing)
+      }
+    })
   }, [])
 
   if (!mounted) return null
