@@ -36,8 +36,9 @@ export default function AdminDashboard() {
         router.push('/admin')
         return
       }
-      setQuizzes(getQuizzes())
-      setTokens(getShareTokens())
+      getQuizzes().then(setQuizzes)
+      getShareTokens().then(setTokens)
+      
     }
   }, [router])
 
