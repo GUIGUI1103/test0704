@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Quiz, getQuizzes, getShareTokens, saveShareTokens } from '@/lib/types'
 import { Suspense } from 'react'
@@ -11,9 +11,13 @@ function SharePageContent() {
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [error, setError] = useState('')
   const [mounted, setMounted] = useState(false)
+  const processed = useRef(false)
 
   useEffect(() => {
     setMounted(true)
+    if (processed.current) return
+    processed.current = true
+
     const token = searchParams.get('token')
     if (!token) {
       setError('无效的链接')
